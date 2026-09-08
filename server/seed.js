@@ -4,6 +4,8 @@ const connectDB = require("./config/db");
 const Slot = require("./models/Slot");
 const Admin = require("./models/Admin");
 
+const Application = require("./models/Application");
+
 const DATES = [
   "2026-09-14",
   "2026-09-15",
@@ -20,6 +22,13 @@ const DATES = [
 ];
 
 const SESSIONS = ["morning", "evening"];
+
+async function clearDatabase() {
+  console.log("[seed] Clearing existing applications and slots...");
+  const appRes = await Application.deleteMany({});
+  const slotRes = await Slot.deleteMany({});
+  console.log(`[seed] Deleted ${appRes.deletedCount} applications and ${slotRes.deletedCount} slots.`);
+}
 
 async function seedSlots() {
   const ops = [];
@@ -55,26 +64,41 @@ async function seedAdmin() {
   }
 
   const existing = await Admin.findOne({ email });
+  const passwordHash = await Admin.hashPassword(password);
+
   if (existing) {
-    console.log(`[seed] Admin account already exists for ${email} — skipping.`);
+    existing.passwordHash = passwordHash;
+    existing.name = name;
+    await existing.save();
+    console.log(`[seed] Admin account refreshed for ${email}.`);
     return;
   }
 
-  const passwordHash = await Admin.hashPassword(password);
   await Admin.create({ name, email, passwordHash });
   console.log(`[seed] Admin account created for ${email}.`);
-  console.log("[seed] IMPORTANT: change this password after first login in production.");
+  console.log("[seed] Password initialized from .env.");
 }
 
 async function run() {
   await connectDB();
+
+  const isClear =
+    process.argv.includes("--clear") ||
+    process.argv.includes("--reset") ||
+    process.env.CLEAR_DB === "true";
+
+  if (isClear) {
+    await clearDatabase();
+  }
+
   await seedSlots();
   await seedAdmin();
   await mongoose.disconnect();
-  console.log("[seed] Done.");
+  console.log("[seed] Database seeding completed successfully.");
 }
 
 run().catch((err) => {
   console.error("[seed] Failed:", err);
   process.exit(1);
 });
+
