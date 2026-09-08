@@ -107,17 +107,25 @@ export default function Home() {
             </div>
           </div>
 
-          {/* 3D Floating Lord Ganesha Centerpiece */}
-          <div className="relative mx-auto w-28 h-28 sm:w-36 sm:h-36 mb-4 flex items-center justify-center">
-            {/* Glowing aura */}
-            <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-amber-500/25 via-saffron-500/30 to-amber-300/10 blur-2xl animate-divine-pulse" />
-            <div className="absolute -inset-3 rounded-full border border-amber-400/20 animate-glow-spin" />
-            {/* 3D Ganesha Image */}
-            <img
-              src="/ganesh-3d.png"
-              alt="Lord Ganesha"
-              className="relative w-full h-full object-contain drop-shadow-[0_15px_30px_rgba(229,193,88,0.5)] animate-float-3d rounded-2xl"
-            />
+          {/* 3D Floating Lord Ganesha Centerpiece (No Black Box) */}
+          <div className="relative mx-auto w-36 h-36 sm:w-44 sm:h-44 mb-6 flex items-center justify-center">
+            {/* Ambient Divine Aura Glow */}
+            <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-amber-500/35 via-orange-500/40 to-amber-300/25 blur-3xl animate-divine-pulse" />
+
+            {/* Rotating Sacred Mandala / Halo Rays */}
+            <div className="absolute -inset-4 rounded-full border-2 border-dashed border-amber-400/35 animate-glow-spin" />
+            <div className="absolute -inset-2 rounded-full border border-amber-400/45 animate-divine-pulse" />
+
+            {/* Circular Divine Medallion with Sculpted Golden Bevel */}
+            <div className="relative w-full h-full rounded-full p-1.5 bg-gradient-to-b from-amber-200 via-amber-500 to-amber-900 shadow-[0_20px_45px_rgba(229,193,88,0.55),0_0_30px_rgba(249,115,22,0.4)] animate-float-3d overflow-hidden">
+              <img
+                src="/ganesh-statue.jpg"
+                alt="Lord Ganesha"
+                className="w-full h-full object-cover object-top rounded-full scale-105"
+              />
+              {/* Subtle glass shimmer reflection */}
+              <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-transparent via-white/15 to-amber-200/25 pointer-events-none" />
+            </div>
           </div>
 
           {/* Title with metallic golden glow */}
