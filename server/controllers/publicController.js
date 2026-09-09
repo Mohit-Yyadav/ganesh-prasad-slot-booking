@@ -23,7 +23,9 @@ async function getAllSlots(req, res, next) {
       if (!byDate[slot.date]) {
         byDate[slot.date] = { date: slot.date, morning: null, evening: null };
       }
-      const applicantName = slot.applicationId?.name || null;
+      const applicantName = slot.isOfficeAllotment
+        ? (slot.applicationId?.name || "Office (Arranged)")
+        : (slot.applicationId?.name || null);
       byDate[slot.date][slot.session] = {
         status: slot.status, // available | closed | allotted
         name: applicantName,
@@ -57,7 +59,9 @@ async function getSlotsForDate(req, res, next) {
 
     const result = { date, morning: null, evening: null };
     for (const slot of slots) {
-      const applicantName = slot.applicationId?.name || null;
+      const applicantName = slot.isOfficeAllotment
+        ? (slot.applicationId?.name || "Office (Arranged)")
+        : (slot.applicationId?.name || null);
       result[slot.session] = {
         status: slot.status,
         name: applicantName,
@@ -79,7 +83,7 @@ async function getSlotsForDate(req, res, next) {
  */
 async function createApplication(req, res, next) {
   try {
-    const { name, mobile, date, session } = req.body || {};
+    const { name, mobile, date, session, prasadDeliveryMode, prasadItem } = req.body || {};
 
     if (!name || typeof name !== "string" || name.trim().length < 3) {
       throw new AppError("Please enter your full name.", 400);
@@ -113,6 +117,8 @@ async function createApplication(req, res, next) {
       mobile: String(mobile).trim(),
       date,
       session,
+      prasadDeliveryMode: prasadDeliveryMode && String(prasadDeliveryMode).trim() ? String(prasadDeliveryMode).trim() : "Self",
+      prasadItem: prasadItem && String(prasadItem).trim() ? String(prasadItem).trim() : "",
       status: "pending",
     });
 
@@ -123,6 +129,8 @@ async function createApplication(req, res, next) {
         name: application.name,
         date: application.date,
         session: application.session,
+        prasadDeliveryMode: application.prasadDeliveryMode,
+        prasadItem: application.prasadItem,
         status: application.status,
         createdAt: application.createdAt,
       },
@@ -167,6 +175,8 @@ async function getApplicationStatus(req, res, next) {
       name: a.name,
       date: a.date,
       session: a.session,
+      prasadDeliveryMode: a.prasadDeliveryMode || "Self",
+      prasadItem: a.prasadItem || "",
       status: a.status,
       rejectionReason: a.rejectionReason,
       createdAt: a.createdAt,

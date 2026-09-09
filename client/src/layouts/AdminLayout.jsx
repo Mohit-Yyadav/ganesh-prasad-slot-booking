@@ -27,42 +27,48 @@ export default function AdminLayout() {
   }
 
   const SidebarContent = (
-    <div className="flex h-full flex-col">
-      <div className="px-5 py-5 border-b border-white/10 space-y-2">
-        <div className="bg-white rounded-xl p-2.5 flex items-center justify-center shadow-sm">
-          <img src="/company-logo.png" alt="Codes for Tomorrow" className="h-7 w-auto object-contain" />
+    <div className="flex h-full flex-col justify-between">
+      <div>
+        <div className="px-5 py-5 border-b border-white/10 space-y-2">
+          <div className="bg-white rounded-xl p-2.5 flex items-center justify-center shadow-sm">
+            <img src="/company-logo.png" alt="Codes for Tomorrow" className="h-7 w-auto object-contain" />
+          </div>
+          <div className="pt-1">
+            <p className="text-xs font-bold text-amber-300 tracking-wide">GANESH PRASAD PORTAL</p>
+            <p className="text-[11px] text-white/60">Admin Management</p>
+          </div>
         </div>
-        <div className="pt-1">
-          <p className="text-xs font-bold text-amber-300 tracking-wide">GANESH PRASAD PORTAL</p>
-          <p className="text-[11px] text-white/60">Admin Management</p>
-        </div>
+
+        <nav className="space-y-1.5 px-3 py-3">
+          {links.map((l) => (
+            <NavLink
+              key={l.to}
+              to={l.to}
+              onClick={() => setDrawerOpen(false)}
+              className={({ isActive }) =>
+                `flex min-h-[44px] items-center gap-3 rounded-xl px-4 text-sm font-medium transition ${
+                  isActive
+                    ? "bg-white/15 text-white font-semibold shadow-xs"
+                    : "text-white/70 hover:bg-white/10 hover:text-white"
+                }`
+              }
+            >
+              <l.icon size={18} />
+              {l.label}
+            </NavLink>
+          ))}
+        </nav>
       </div>
 
-      <nav className="flex-1 space-y-1 px-3">
-        {links.map((l) => (
-          <NavLink
-            key={l.to}
-            to={l.to}
-            onClick={() => setDrawerOpen(false)}
-            className={({ isActive }) =>
-              `flex min-h-[48px] items-center gap-3 rounded-xl px-4 text-sm font-medium transition ${
-                isActive ? "bg-white/10 text-white" : "text-white/70 hover:bg-white/5 hover:text-white"
-              }`
-            }
-          >
-            <l.icon size={18} />
-            {l.label}
-          </NavLink>
-        ))}
-      </nav>
-
-      <div className="border-t border-white/10 p-3">
-        <div className="mb-2 px-3 py-2 text-xs text-white/50">{admin?.email}</div>
+      <div className="border-t border-white/10 p-3.5 bg-maroon-900/50">
+        <div className="mb-2 px-3 py-1 text-xs font-mono text-amber-200/80 truncate">
+          {admin?.email}
+        </div>
         <button
           onClick={handleLogout}
-          className="flex min-h-[48px] w-full items-center gap-3 rounded-xl px-4 text-sm font-medium text-white/70 hover:bg-white/5 hover:text-white"
+          className="flex min-h-[44px] w-full items-center justify-center gap-2.5 rounded-xl px-4 text-sm font-semibold text-red-200 bg-red-950/40 hover:bg-red-900/60 border border-red-500/20 hover:text-white transition"
         >
-          <LogOut size={18} /> Logout
+          <LogOut size={16} /> Logout
         </button>
       </div>
     </div>
@@ -70,14 +76,16 @@ export default function AdminLayout() {
 
   return (
     <div className="flex min-h-screen bg-cream-100">
-      {/* Desktop sidebar */}
-      <aside className="hidden w-64 flex-shrink-0 bg-maroon-800 md:block">{SidebarContent}</aside>
+      {/* Desktop sidebar - sticky so it stays visible while scrolling, Logout button always visible */}
+      <aside className="hidden w-64 flex-shrink-0 bg-maroon-800 md:block sticky top-0 h-screen z-30 shadow-xl overflow-hidden">
+        {SidebarContent}
+      </aside>
 
       {/* Mobile drawer */}
       {drawerOpen && (
         <div className="fixed inset-0 z-50 md:hidden">
           <div className="absolute inset-0 bg-black/40" onClick={() => setDrawerOpen(false)} />
-          <div className="absolute inset-y-0 left-0 w-64 bg-maroon-800 shadow-2xl">
+          <div className="absolute inset-y-0 left-0 w-64 bg-maroon-800 shadow-2xl h-full overflow-hidden">
             {SidebarContent}
           </div>
         </div>

@@ -32,6 +32,14 @@ const SlotSchema = new mongoose.Schema(
       ref: "Admin",
       default: null,
     },
+    isOfficeAllotment: {
+      type: Boolean,
+      default: false,
+    },
+    officeNote: {
+      type: String,
+      default: "",
+    },
   },
   { timestamps: true }
 );

@@ -1,27 +1,28 @@
 import React, { useState } from "react";
 import { useNavigate, useLocation, Link } from "react-router-dom";
 import { toast } from "sonner";
-import { Lock, Loader2, ShieldCheck, Eye, EyeOff, ArrowLeft } from "lucide-react";
+import { Lock, Mail, Loader2, Eye, EyeOff, ArrowLeft } from "lucide-react";
 import { useAuth } from "../../context/AuthContext.jsx";
 
 export default function AdminLogin() {
   const { login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e) {
     e.preventDefault();
-    if (!password) return;
+    if (!email.trim() || !password) return;
     setLoading(true);
     try {
-      await login(password);
+      await login(password, email.trim());
       toast.success("Welcome back, Admin.");
       navigate(location.state?.from || "/admin/dashboard", { replace: true });
     } catch (err) {
-      toast.error(err.message || "Invalid password.");
+      toast.error(err.message || "Invalid credentials.");
     } finally {
       setLoading(false);
     }
@@ -39,10 +40,30 @@ export default function AdminLogin() {
           Admin Portal
         </h1>
         <p className="mt-1 text-center text-xs text-maroon-700/70">
-          Codes for Tomorrow · Enter password to access
+          Codes for Tomorrow · Enter credentials to access
         </p>
 
         <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+          <div>
+            <label htmlFor="email" className="mb-1.5 block text-xs font-semibold text-maroon-800 uppercase tracking-wide">
+              Admin Email
+            </label>
+            <div className="relative">
+              <Mail className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-maroon-400" size={18} />
+              <input
+                id="email"
+                type="email"
+                required
+                autoFocus
+                placeholder="Enter your email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="min-h-[48px] w-full rounded-xl border border-saffron-200 pl-10 pr-4 text-base text-maroon-900 placeholder:text-gray-400 focus:border-saffron-500 focus:ring-1 focus:ring-saffron-500 outline-none"
+                autoComplete="email"
+              />
+            </div>
+          </div>
+
           <div>
             <label htmlFor="password" className="mb-1.5 block text-xs font-semibold text-maroon-800 uppercase tracking-wide">
               Admin Password
@@ -53,8 +74,7 @@ export default function AdminLogin() {
                 id="password"
                 type={showPassword ? "text" : "password"}
                 required
-                autoFocus
-                placeholder="Enter password"
+                placeholder="Enter your password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="min-h-[48px] w-full rounded-xl border border-saffron-200 pl-10 pr-11 text-base text-maroon-900 placeholder:text-gray-400 focus:border-saffron-500 focus:ring-1 focus:ring-saffron-500 outline-none"
@@ -73,7 +93,7 @@ export default function AdminLogin() {
 
           <button
             type="submit"
-            disabled={loading || !password.trim()}
+            disabled={loading || !email.trim() || !password.trim()}
             className="flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl bg-maroon-700 text-base font-semibold text-white hover:bg-maroon-800 disabled:opacity-60 transition"
           >
             {loading ? <Loader2 className="animate-spin" size={18} /> : <Lock size={18} />}

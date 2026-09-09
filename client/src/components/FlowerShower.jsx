@@ -225,7 +225,7 @@ export default function FlowerShower() {
       <button
         type="button"
         onClick={() => setEnabled((prev) => !prev)}
-        className="fixed bottom-4 right-4 z-40 flex items-center gap-2 rounded-full px-3.5 py-2 text-xs font-semibold backdrop-blur-md shadow-lg transition-all duration-300 hover:scale-105"
+        className="fixed bottom-20 sm:bottom-4 right-3 sm:right-4 z-40 flex items-center gap-2 rounded-full px-3 sm:px-3.5 py-1.5 sm:py-2 text-[11px] sm:text-xs font-semibold backdrop-blur-md shadow-lg transition-all duration-300 hover:scale-105"
         style={{
           background: enabled
             ? "linear-gradient(135deg, rgba(234,88,12,0.85), rgba(154,45,45,0.9))"

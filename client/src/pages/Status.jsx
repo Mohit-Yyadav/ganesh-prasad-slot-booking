@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useLocation, Link } from "react-router-dom";
 import { Search, Loader2, CheckCircle2, XCircle, Circle, ArrowLeft } from "lucide-react";
 import { fetchApplicationStatus } from "../services/api";
@@ -12,8 +12,21 @@ export default function Status() {
   const [application, setApplication] = useState(null);
   const [error, setError] = useState(null);
 
+  useEffect(() => {
+    if (location.state?.presetApplicationId) {
+      const id = location.state.presetApplicationId.trim();
+      setApplicationId(id);
+      setLoading(true);
+      setError(null);
+      fetchApplicationStatus({ applicationId: id })
+        .then((data) => setApplication(data.application))
+        .catch((err) => setError(err.message))
+        .finally(() => setLoading(false));
+    }
+  }, [location.state?.presetApplicationId]);
+
   async function handleSearch(e) {
-    e.preventDefault();
+    if (e) e.preventDefault();
     if (!applicationId.trim()) return;
     setLoading(true);
     setError(null);
@@ -29,15 +42,15 @@ export default function Status() {
   }
 
   return (
-    <div className="mx-auto max-w-xl px-4 py-8 sm:py-12 sm:px-6">
+    <div className="mx-auto max-w-xl px-3 py-6 sm:py-12 sm:px-6">
       <h1 className="text-2xl sm:text-3xl font-bold font-display text-transparent bg-clip-text bg-gradient-to-r from-amber-200 via-amber-400 to-orange-400">
         Check Application Status
       </h1>
-      <p className="mt-1.5 text-sm text-amber-200/70">
+      <p className="mt-1.5 text-xs sm:text-sm text-amber-200/70">
         Enter your Application ID to view your Prasad Seva status.
       </p>
 
-      <form onSubmit={handleSearch} className="mt-6 flex flex-col gap-3 sm:flex-row">
+      <form onSubmit={handleSearch} className="mt-5 sm:mt-6 flex flex-col gap-3 sm:flex-row">
         <input
           value={applicationId}
           onChange={(e) => setApplicationId(e.target.value)}
@@ -68,6 +81,16 @@ export default function Status() {
               <Row label="Name" value={application.name} />
               <Row label="Date" value={formatDateLong(application.date)} />
               <Row label="Session" value={sessionLabel(application.session)} />
+              {application.prasadItem && (
+                <Row label="Prasad Item" value={application.prasadItem} />
+              )}
+              {application.prasadDeliveryMode && (
+                <Row label="Delivery Mode" value={application.prasadDeliveryMode} />
+              )}
+              <Row
+                label="Office Timing Deadline"
+                value={application.session === "morning" ? "By 9:00 AM" : "By 6:00 PM"}
+              />
             </div>
 
             <div className="px-5 py-5 border-t border-white/10">

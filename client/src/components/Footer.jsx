@@ -19,16 +19,9 @@ export default function Footer() {
             </div>
             <span className="text-gold-400/30">|</span>
             <div className="flex items-center gap-2">
-              <span
-                className="flex h-7 w-7 items-center justify-center rounded-full text-sm font-bold"
-                style={{
-                  background: "linear-gradient(135deg, #9a2d2d, #5c1616)",
-                  border: "1px solid rgba(195,118,118,0.4)",
-                  color: "#e5c158",
-                }}
-              >
-                ॐ
-              </span>
+              <div className="relative h-7 w-7 rounded-full p-0.5 bg-gradient-to-tr from-amber-400 to-orange-500 shadow-md flex items-center justify-center">
+                <img src="/ganesh-3d.png" alt="Ganesh Ji" className="h-full w-full object-contain rounded-full" />
+              </div>
               <span className="font-display text-sm font-semibold" style={{ color: "#e5c158" }}>
                 Shree Ganesh Utsav 2026
               </span>

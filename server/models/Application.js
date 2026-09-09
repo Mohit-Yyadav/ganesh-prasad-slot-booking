@@ -30,6 +30,15 @@ const ApplicationSchema = new mongoose.Schema(
       required: true,
       enum: ["morning", "evening"],
     },
+    prasadDeliveryMode: {
+      type: String,
+      default: "Self",
+    },
+    prasadItem: {
+      type: String,
+      trim: true,
+      default: "",
+    },
     status: {
       type: String,
       enum: ["pending", "approved", "rejected"],

@@ -3,6 +3,7 @@ import { Outlet } from "react-router-dom";
 import Header from "../components/Header.jsx";
 import Footer from "../components/Footer.jsx";
 import FlowerShower from "../components/FlowerShower.jsx";
+import InstallPWA from "../components/InstallPWA.jsx";
 
 export default function PublicLayout() {
   return (
@@ -13,6 +14,7 @@ export default function PublicLayout() {
         <Outlet />
       </main>
       <Footer />
+      <InstallPWA />
     </div>
   );
 }

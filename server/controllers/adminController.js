@@ -3,6 +3,7 @@ const { Parser: CsvParser } = require("json2csv");
 const Admin = require("../models/Admin");
 const Application = require("../models/Application");
 const Slot = require("../models/Slot");
+const { generateApplicationId } = require("../utils/generateId");
 const { AppError } = require("../middleware/errorHandler");
 
 function signToken(admin) {
@@ -20,14 +21,17 @@ async function login(req, res, next) {
     }
 
     let admin;
-    if (email) {
+    if (email && String(email).trim()) {
       admin = await Admin.findOne({ email: String(email).toLowerCase().trim() }).select(
         "+passwordHash"
       );
     } else {
-      // Allow single-field password login using the default admin account
-      const defaultEmail = (process.env.SEED_ADMIN_EMAIL || "admin@example.com").toLowerCase().trim();
+      // Allow single-field password login using the default or seeded admin account
+      const defaultEmail = (process.env.SEED_ADMIN_EMAIL || "admin@admin.com").toLowerCase().trim();
       admin = await Admin.findOne({ email: defaultEmail }).select("+passwordHash");
+      if (!admin) {
+        admin = await Admin.findOne({ email: "admin@example.com" }).select("+passwordHash");
+      }
       if (!admin) {
         admin = await Admin.findOne({}).select("+passwordHash");
       }
@@ -113,6 +117,8 @@ function shapeApplication(a) {
     mobile: a.mobile,
     date: a.date,
     session: a.session,
+    prasadDeliveryMode: a.prasadDeliveryMode || "Self",
+    prasadItem: a.prasadItem || "",
     status: a.status,
     rejectionReason: a.rejectionReason,
     createdAt: a.createdAt,
@@ -239,25 +245,6 @@ async function approveApplication(req, res, next) {
     application.approvedBy = req.admin.id;
     await application.save();
 
-    // Courtesy cleanup: any other still-pending applications for the exact
-    // same date + session can no longer be granted, so we close them out
-    // with a clear reason rather than leaving them stuck as "pending".
-    await Application.updateMany(
-      {
-        _id: { $ne: application._id },
-        date: application.date,
-        session: application.session,
-        status: "pending",
-      },
-      {
-        $set: {
-          status: "rejected",
-          rejectedAt: new Date(),
-          rejectionReason: "This slot was allotted to another applicant.",
-        },
-      }
-    );
-
     res.json({
       message: "Application approved and slot allotted successfully.",
       application: shapeApplication(application.toObject()),
@@ -274,20 +261,37 @@ async function rejectApplication(req, res, next) {
     const application = await Application.findById(req.params.id);
     if (!application) throw new AppError("Application not found.", 404);
 
-    if (application.status === "approved") {
-      throw new AppError(
-        "This application is already approved. Reverting an approved allotment must be done from Slot Management.",
-        409
+    const wasApproved = application.status === "approved";
+
+    // If application was already approved, release its slot back to available
+    if (wasApproved) {
+      await Slot.findOneAndUpdate(
+        { date: application.date, session: application.session, applicationId: application._id },
+        {
+          $set: {
+            status: "available",
+            applicationId: null,
+            allottedAt: null,
+            allottedBy: null,
+          },
+        }
       );
     }
 
     application.status = "rejected";
     application.rejectedAt = new Date();
-    application.rejectionReason = reason && String(reason).trim() ? String(reason).trim() : null;
+    application.rejectionReason =
+      reason && String(reason).trim()
+        ? String(reason).trim()
+        : wasApproved
+        ? "Slot allotment revoked by admin."
+        : null;
     await application.save();
 
     res.json({
-      message: "Application rejected.",
+      message: wasApproved
+        ? "Allotment revoked and slot made available again."
+        : "Application rejected.",
       application: shapeApplication(application.toObject()),
     });
   } catch (err) {
@@ -311,9 +315,8 @@ async function listSlots(req, res, next) {
 /**
  * PATCH /api/admin/slots/:id
  * Body: { status: 'available' | 'closed' }
- * Admin can only toggle between available/closed manually.
- * A slot can never be pushed back from "allotted" here — that would
- * silently break the one-slot-one-applicant guarantee.
+ * Admin can toggle between available/closed.
+ * If slot was allotted, releasing it will also cancel/revoke the associated application.
  */
 async function updateSlot(req, res, next) {
   try {
@@ -326,16 +329,171 @@ async function updateSlot(req, res, next) {
     if (!slot) throw new AppError("Slot not found.", 404);
 
     if (slot.status === "allotted") {
-      throw new AppError(
-        "This slot is already allotted and cannot be modified from here.",
-        409
-      );
+      // Release slot: mark linked application as revoked/rejected
+      if (slot.applicationId) {
+        await Application.findByIdAndUpdate(slot.applicationId, {
+          $set: {
+            status: "rejected",
+            rejectedAt: new Date(),
+            rejectionReason: "Slot allotment revoked via Slot Management.",
+          },
+        });
+      }
+      slot.applicationId = null;
+      slot.allottedAt = null;
+      slot.allottedBy = null;
+      slot.isOfficeAllotment = false;
+      slot.officeNote = "";
     }
 
     slot.status = status;
     await slot.save();
 
     res.json({ message: "Slot updated successfully.", slot });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * POST /api/admin/slots
+ * Body: { date, session, sessions, status }
+ * Creates new slot(s) for a given date.
+ */
+async function createSlot(req, res, next) {
+  try {
+    const { date, session, sessions, status = "available" } = req.body || {};
+    if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      throw new AppError("Please provide a valid date (YYYY-MM-DD).", 400);
+    }
+
+    const sessionsToCreate =
+      sessions && Array.isArray(sessions) && sessions.length > 0
+        ? sessions
+        : session
+        ? [session]
+        : ["morning", "evening"];
+
+    for (const s of sessionsToCreate) {
+      if (!["morning", "evening"].includes(s)) {
+        throw new AppError(`Invalid session: ${s}. Must be 'morning' or 'evening'.`, 400);
+      }
+    }
+
+    const createdSlots = [];
+    const skippedSessions = [];
+
+    for (const s of sessionsToCreate) {
+      const existing = await Slot.findOne({ date, session: s });
+      if (existing) {
+        skippedSessions.push(s);
+        continue;
+      }
+      const newSlot = await Slot.create({
+        date,
+        session: s,
+        status: status === "closed" ? "closed" : "available",
+      });
+      createdSlots.push(newSlot);
+    }
+
+    if (createdSlots.length === 0 && skippedSessions.length > 0) {
+      throw new AppError(`Slot(s) for ${date} already exist (${skippedSessions.join(", ")}).`, 409);
+    }
+
+    res.status(201).json({
+      message: `Successfully created ${createdSlots.length} slot(s) for ${date}.`,
+      slots: createdSlots,
+      skipped: skippedSessions,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * DELETE /api/admin/slots/:id
+ * Removes a slot from the schedule.
+ */
+async function deleteSlot(req, res, next) {
+  try {
+    const slot = await Slot.findById(req.params.id);
+    if (!slot) throw new AppError("Slot not found.", 404);
+
+    if (slot.status === "allotted") {
+      if (slot.applicationId) {
+        await Application.findByIdAndUpdate(slot.applicationId, {
+          $set: {
+            status: "rejected",
+            rejectedAt: new Date(),
+            rejectionReason: "Slot was deleted by administrator.",
+          },
+        });
+      }
+    }
+
+    await Slot.findByIdAndDelete(req.params.id);
+    res.json({ message: "Slot deleted successfully.", id: req.params.id });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * PATCH /api/admin/slots/:id/allot-office
+ * Body: { officeName, prasadItem, note }
+ * Directly allots a slot to the Office.
+ */
+async function allotSlotToOffice(req, res, next) {
+  try {
+    const {
+      officeName = "Codes for Tomorrow (Office)",
+      prasadItem = "Office Arranged Prasad",
+      note = "",
+    } = req.body || {};
+
+    const slot = await Slot.findById(req.params.id);
+    if (!slot) throw new AppError("Slot not found.", 404);
+
+    if (slot.status === "allotted" && !slot.isOfficeAllotment) {
+      throw new AppError(
+        "This slot is already allotted to an applicant. Release it before allotting to Office.",
+        409
+      );
+    }
+
+    const applicationId = await generateApplicationId();
+
+    const officeApp = await Application.create({
+      applicationId,
+      name: String(officeName).trim() || "Codes for Tomorrow (Office)",
+      mobile: "9999999999",
+      date: slot.date,
+      session: slot.session,
+      prasadDeliveryMode: "Office",
+      prasadItem: String(prasadItem).trim() || "Office Arranged Prasad",
+      status: "approved",
+      approvedAt: new Date(),
+      approvedBy: req.admin?.id || null,
+    });
+
+    slot.status = "allotted";
+    slot.applicationId = officeApp._id;
+    slot.isOfficeAllotment = true;
+    slot.officeNote = String(note).trim();
+    slot.allottedAt = new Date();
+    slot.allottedBy = req.admin?.id || null;
+    await slot.save();
+
+    await slot.populate({
+      path: "applicationId",
+      select: "applicationId name mobile status prasadItem prasadDeliveryMode",
+    });
+
+    res.json({
+      message: `Slot on ${slot.date} (${slot.session}) successfully allotted to Office.`,
+      slot,
+    });
   } catch (err) {
     next(err);
   }
@@ -352,6 +510,8 @@ async function exportApplications(req, res, next) {
       Mobile: a.mobile,
       Date: a.date,
       Session: a.session,
+      "Delivery Mode": a.prasadDeliveryMode || "Self",
+      "Prasad Item": a.prasadItem || "",
       Status: a.status,
       "Applied At": a.createdAt ? new Date(a.createdAt).toISOString() : "",
       "Approved At": a.approvedAt ? new Date(a.approvedAt).toISOString() : "",
@@ -368,6 +528,123 @@ async function exportApplications(req, res, next) {
   }
 }
 
+/**
+ * PATCH /api/admin/applications/:id/slot
+ * Body: { date, session }
+ * Allows admin to reschedule an application to any available slot.
+ */
+async function updateApplicationSlot(req, res, next) {
+  try {
+    const { date, session } = req.body || {};
+    if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      throw new AppError("Please provide a valid date (YYYY-MM-DD).", 400);
+    }
+    if (!session || !["morning", "evening"].includes(session)) {
+      throw new AppError("Please select a valid session (morning or evening).", 400);
+    }
+
+    const application = await Application.findById(req.params.id);
+    if (!application) throw new AppError("Application not found.", 404);
+
+    // If already on the requested slot, no change needed
+    if (application.date === date && application.session === session) {
+      return res.json({
+        message: "Application is already scheduled for this slot.",
+        application: shapeApplication(application.toObject()),
+      });
+    }
+
+    // Check target slot status
+    const targetSlot = await Slot.findOne({ date, session });
+    if (!targetSlot) {
+      throw new AppError("Selected slot does not exist.", 404);
+    }
+    if (targetSlot.status === "closed") {
+      throw new AppError("This slot is currently closed for bookings.", 409);
+    }
+    if (targetSlot.status === "allotted") {
+      throw new AppError("This slot is already allotted to another applicant.", 409);
+    }
+
+    // If the application was already approved, transfer allotment
+    if (application.status === "approved") {
+      // 1. Atomically claim new slot
+      const claimedNewSlot = await Slot.findOneAndUpdate(
+        { date, session, status: "available" },
+        {
+          $set: {
+            status: "allotted",
+            applicationId: application._id,
+            allottedAt: new Date(),
+            allottedBy: req.admin.id,
+          },
+        },
+        { new: true }
+      );
+
+      if (!claimedNewSlot) {
+        throw new AppError("Target slot was just taken. Please select another slot.", 409);
+      }
+
+      // 2. Free up the old slot
+      await Slot.findOneAndUpdate(
+        { date: application.date, session: application.session, applicationId: application._id },
+        {
+          $set: {
+            status: "available",
+            applicationId: null,
+            allottedAt: null,
+            allottedBy: null,
+          },
+        }
+      );
+    } else if (application.status === "rejected") {
+      // If was previously rejected, re-open it as pending on the new slot
+      application.status = "pending";
+      application.rejectionReason = null;
+      application.rejectedAt = null;
+    }
+
+    // Update application slot
+    application.date = date;
+    application.session = session;
+    await application.save();
+
+    res.json({
+      message: `Application rescheduled to ${date} (${session}) successfully.`,
+      application: shapeApplication(application.toObject()),
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * PATCH /api/admin/applications/:id
+ * Body: { prasadItem, prasadDeliveryMode, name, mobile }
+ * Allows admin to edit application details (such as Prasad Item or Delivery Mode).
+ */
+async function updateApplicationDetails(req, res, next) {
+  try {
+    const { prasadItem, prasadDeliveryMode, name, mobile } = req.body || {};
+    const application = await Application.findById(req.params.id);
+    if (!application) throw new AppError("Application not found.", 404);
+
+    if (prasadItem !== undefined) application.prasadItem = String(prasadItem).trim();
+    if (prasadDeliveryMode !== undefined) application.prasadDeliveryMode = String(prasadDeliveryMode).trim();
+    if (name) application.name = String(name).trim();
+    if (mobile) application.mobile = String(mobile).trim();
+
+    await application.save();
+    res.json({
+      message: "Application updated successfully.",
+      application: shapeApplication(application.toObject()),
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
 module.exports = {
   login,
   me,
@@ -376,7 +653,12 @@ module.exports = {
   getApplication,
   approveApplication,
   rejectApplication,
+  updateApplicationSlot,
+  updateApplicationDetails,
   listSlots,
   updateSlot,
+  createSlot,
+  deleteSlot,
+  allotSlotToOffice,
   exportApplications,
 };

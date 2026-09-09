@@ -1,4 +1,4 @@
-﻿import React from "react";
+import React from "react";
 
 export function LoadingState({ label = "Loading..." }) {
   return (
@@ -15,11 +15,14 @@ export function LoadingState({ label = "Loading..." }) {
   );
 }
 
-export function EmptyState({ label = "Nothing here yet." }) {
+export function EmptyState({ title, description, label = "Nothing here yet." }) {
   return (
-    <div className="flex flex-col items-center justify-center py-16 gap-3">
-      <span className="text-4xl">🙏</span>
-      <p style={{ color: "rgba(253,246,232,0.4)", fontSize: "0.88rem" }}>{label}</p>
+    <div className="flex flex-col items-center justify-center py-14 gap-2 text-center px-4">
+      <span className="text-4xl mb-1">🙏</span>
+      <h3 className="font-bold text-base text-amber-200">{title || label}</h3>
+      {description && (
+        <p className="text-xs text-amber-100/60 max-w-xs">{description}</p>
+      )}
     </div>
   );
 }

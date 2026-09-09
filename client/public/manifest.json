@@ -1,0 +1,37 @@
+{
+  "name": "Shree Ganesh Prasad Seva — Codes for Tomorrow",
+  "short_name": "Ganesh Prasad",
+  "description": "Devotee Prasad Seva Slot Booking & Allotment Portal",
+  "start_url": "/",
+  "id": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0c0205",
+  "theme_color": "#400f0f",
+  "categories": ["lifestyle", "utilities"],
+  "icons": [
+    {
+      "src": "/ganesh-divine.png",
+      "sizes": "192x192 512x512 1024x1024",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/ganesh-divine.png",
+      "sizes": "192x192 512x512 1024x1024",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/ganesh-3d.png",
+      "sizes": "192x192 512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/ganesh-favicon.png",
+      "sizes": "128x128",
+      "type": "image/png"
+    }
+  ]
+}

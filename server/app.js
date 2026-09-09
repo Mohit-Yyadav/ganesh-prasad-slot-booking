@@ -17,6 +17,9 @@ const { notFound, errorHandler } = require("./middleware/errorHandler");
 
 const app = express();
 
+// Trust reverse proxy (Render, AWS, Nginx) so express-rate-limit detects real client IPs
+app.set("trust proxy", 1);
+
 app.use(
   helmet({
     contentSecurityPolicy: false,
@@ -54,6 +57,17 @@ if (process.env.NODE_ENV !== "test") {
 }
 
 app.get("/api/health", (req, res) => res.json({ status: "ok" }));
+
+// Prevent caching on all API endpoints so real-time polling always receives fresh database state
+app.use("/api", (req, res, next) => {
+  res.set({
+    "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0",
+    Pragma: "no-cache",
+    Expires: "0",
+    "Surrogate-Control": "no-store",
+  });
+  next();
+});
 
 app.use("/api", publicRoutes);
 app.use("/api/admin", adminRoutes);

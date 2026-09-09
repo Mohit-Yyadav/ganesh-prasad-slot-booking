@@ -8,12 +8,23 @@ export const baseURL = rawBase;
 
 export const api = axios.create({ baseURL });
 
-// Attach admin token automatically when present
+// Attach admin token automatically when present, and add cache-buster to GET requests
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem("gp_admin_token");
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
+
+  // Prevent browser & CDN caching by appending a unique timestamp to GET queries
+  if (!config.method || config.method.toLowerCase() === "get") {
+    config.params = {
+      ...config.params,
+      _t: Date.now(),
+    };
+    config.headers["Cache-Control"] = "no-cache";
+    config.headers["Pragma"] = "no-cache";
+  }
+
   return config;
 });
 
@@ -50,7 +61,17 @@ export const adminApprove = (id) =>
   api.patch(`/admin/applications/${id}/approve`).then((r) => r.data);
 export const adminReject = (id, reason) =>
   api.patch(`/admin/applications/${id}/reject`, { reason }).then((r) => r.data);
+export const adminUpdateApplication = (id, payload) =>
+  api.patch(`/admin/applications/${id}`, payload).then((r) => r.data);
+export const adminUpdateApplicationSlot = (id, payload) =>
+  api.patch(`/admin/applications/${id}/slot`, payload).then((r) => r.data);
 export const adminListSlots = () => api.get("/admin/slots").then((r) => r.data);
+export const adminCreateSlot = (payload) =>
+  api.post("/admin/slots", payload).then((r) => r.data);
 export const adminUpdateSlot = (id, status) =>
   api.patch(`/admin/slots/${id}`, { status }).then((r) => r.data);
+export const adminDeleteSlot = (id) =>
+  api.delete(`/admin/slots/${id}`).then((r) => r.data);
+export const adminAllotSlotToOffice = (id, payload) =>
+  api.patch(`/admin/slots/${id}/allot-office`, payload).then((r) => r.data);
 export const adminExportUrl = () => `${baseURL}/admin/applications/export`;

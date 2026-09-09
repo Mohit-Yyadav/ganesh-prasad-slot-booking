@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useCallback } from "react";
 import { useLocation, Link } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -13,6 +13,8 @@ import {
   User,
   Phone,
   Loader2,
+  Clock,
+  Gift,
 } from "lucide-react";
 import { getAllSlots, submitApplication } from "../services/api";
 import {
@@ -34,6 +36,14 @@ const formSchema = z.object({
     .string()
     .trim()
     .regex(/^[6-9]\d{9}$/, "Please enter a valid 10-digit mobile number."),
+  prasadDeliveryMode: z
+    .string()
+    .default("Self"),
+  prasadItem: z
+    .string()
+    .trim()
+    .min(2, "Please specify what Prasad you will be bringing.")
+    .max(120, "Prasad item description is too long."),
 });
 
 const STEPS = ["date", "session", "form", "summary", "success"];
@@ -47,21 +57,55 @@ export default function BookSlot() {
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState(presetDate || null);
   const [selectedSession, setSelectedSession] = useState(null);
-  const [formValues, setFormValues] = useState({ name: "", mobile: "" });
+  const [formValues, setFormValues] = useState({
+    name: "",
+    mobile: "",
+    prasadDeliveryMode: "Self",
+    prasadItem: "",
+  });
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState(null);
 
-  const loadSlots = () => {
-    setLoading(true);
-    getAllSlots()
+  const loadSlots = useCallback((silent = false) => {
+    if (!silent) setLoading(true);
+    return getAllSlots()
       .then((data) => setDates(data.dates || []))
-      .catch(() => toast.error("Could not load available dates. Please try again."))
-      .finally(() => setLoading(false));
-  };
+      .catch(() => {
+        if (!silent) toast.error("Could not load available dates. Please try again.");
+      })
+      .finally(() => {
+        if (!silent) setLoading(false);
+      });
+  }, []);
 
   useEffect(() => {
-    loadSlots();
-  }, []);
+    loadSlots(false);
+
+    // Auto-refresh slots every 6 seconds so devotee always sees latest slot availability
+    const timer = setInterval(() => {
+      if (document.visibilityState === "visible") {
+        loadSlots(true);
+      }
+    }, 6000);
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        loadSlots(true);
+      }
+    };
+    const onFocus = () => {
+      loadSlots(true);
+    };
+
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    window.addEventListener("focus", onFocus);
+
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [loadSlots]);
 
   const selectedDateObj = useMemo(
     () => dates.find((d) => d.date === selectedDate),
@@ -71,11 +115,15 @@ export default function BookSlot() {
   const {
     register,
     handleSubmit,
+    setValue,
+    watch,
     formState: { errors },
   } = useForm({
     resolver: zodResolver(formSchema),
     defaultValues: formValues,
   });
+
+  const watchDeliveryMode = watch("prasadDeliveryMode", "Self");
 
   function goTo(nextStep) {
     setStep(nextStep);
@@ -105,35 +153,33 @@ export default function BookSlot() {
         mobile: formValues.mobile,
         date: selectedDate,
         session: selectedSession,
+        prasadDeliveryMode: formValues.prasadDeliveryMode,
+        prasadItem: formValues.prasadItem,
       });
       setResult(data.application);
       toast.success("Application submitted successfully.");
       goTo("success");
     } catch (err) {
       toast.error(err.message);
-      // Slot may have just been taken — refresh availability so the user
-      // isn't stuck looking at a stale "available" state.
       loadSlots();
     } finally {
       setSubmitting(false);
     }
   }
 
-  const stepIndex = STEPS.indexOf(step);
-
   return (
-    <div className="mx-auto max-w-2xl px-4 py-8 sm:py-12 sm:px-6">
+    <div className="mx-auto max-w-2xl px-3 py-6 sm:py-12 sm:px-6">
       {step !== "success" && (
         <>
           <h1 className="text-2xl sm:text-3xl font-bold font-display text-transparent bg-clip-text bg-gradient-to-r from-amber-200 via-amber-400 to-orange-400">
             Book Your Prasad Slot
           </h1>
-          <p className="mt-1.5 text-sm text-amber-200/70">
+          <p className="mt-1.5 text-xs sm:text-sm text-amber-200/70">
             Complete a few simple steps to submit your Prasad Seva application.
           </p>
 
           {/* Progress */}
-          <div className="mt-6 flex items-center gap-2">
+          <div className="mt-5 sm:mt-6 flex items-center gap-2">
             {["Date & Session", "Your Details", "Review & Submit"].map((label, i) => {
               const active = i <= (step === "date" ? 0 : step === "session" ? 0 : step === "form" ? 1 : 2);
               return (
@@ -150,16 +196,21 @@ export default function BookSlot() {
         </>
       )}
 
-      {/* STEP: date */}
-      {step === "date" && (
+      {/* Global loading state when dates are fetching */}
+      {loading && (
         <div className="mt-8">
-          <h2 className="mb-4 text-lg font-semibold text-amber-200">Select a Date</h2>
-          {loading ? (
-            <LoadingState label="Loading available dates..." />
-          ) : dates.length === 0 ? (
+          <LoadingState label="Loading available dates & slots..." />
+        </div>
+      )}
+
+      {/* STEP: date */}
+      {!loading && step === "date" && (
+        <div className="mt-6 sm:mt-8">
+          <h2 className="mb-4 text-base sm:text-lg font-semibold text-amber-200">Select a Date</h2>
+          {dates.length === 0 ? (
             <EmptyState title="No dates available" description="Please check back later." />
           ) : (
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3">
               {dates.map((d) => {
                 const availableCount = ["morning", "evening"].filter(
                   (s) => d[s]?.status === "available"
@@ -170,21 +221,21 @@ export default function BookSlot() {
                     key={d.date}
                     disabled={disabled}
                     onClick={() => handlePickDate(d.date)}
-                    className={`min-h-[120px] rounded-2xl border p-4 text-center transition-all duration-300 ${
+                    className={`min-h-[110px] sm:min-h-[120px] rounded-2xl border p-3 sm:p-4 text-center transition-all duration-300 ${
                       disabled
                         ? "cursor-not-allowed border-white/5 bg-white/5 opacity-40"
                         : "date-card hover:-translate-y-1.5 hover:shadow-[0_15px_30px_rgba(229,193,88,0.2)]"
                     }`}
                   >
-                    <p className="text-xs font-semibold tracking-wider text-amber-400">
+                    <p className="text-[11px] sm:text-xs font-semibold tracking-wider text-amber-400">
                       {formatMonthShort(d.date)}
                     </p>
-                    <p className="my-1 text-2xl sm:text-3xl font-bold text-white">
+                    <p className="my-0.5 sm:my-1 text-2xl sm:text-3xl font-bold text-white">
                       {formatDayNumber(d.date)}
                     </p>
-                    <p className="text-xs text-amber-100/60">{formatWeekday(d.date)}</p>
+                    <p className="text-[11px] sm:text-xs text-amber-100/60">{formatWeekday(d.date)}</p>
                     <p
-                      className={`mt-2 text-[11px] font-semibold ${
+                      className={`mt-1.5 sm:mt-2 text-[10px] sm:text-[11px] font-semibold ${
                         disabled ? "text-red-400" : "text-emerald-400"
                       }`}
                     >
@@ -198,17 +249,28 @@ export default function BookSlot() {
         </div>
       )}
 
+      {/* STEP: session when date not found fallback */}
+      {!loading && step === "session" && !selectedDateObj && (
+        <div className="mt-8 text-center animate-fadeIn py-8">
+          <p className="text-base text-amber-200 mb-2">The selected date is no longer available.</p>
+          <p className="text-xs text-amber-100/60 mb-5">Please pick another date from the schedule.</p>
+          <button onClick={() => goTo("date")} className="btn-gold-3d">
+            View Available Dates
+          </button>
+        </div>
+      )}
+
       {/* STEP: session */}
-      {step === "session" && selectedDateObj && (
-        <div className="mt-8">
+      {!loading && step === "session" && selectedDateObj && (
+        <div className="mt-6 sm:mt-8">
           <button
             onClick={() => goTo("date")}
             className="mb-4 inline-flex min-h-[44px] items-center gap-1 text-sm font-medium text-amber-300 hover:text-amber-200 transition"
           >
             <ChevronLeft size={16} /> Change date
           </button>
-          <h2 className="mb-1 text-lg font-semibold text-amber-200">Select a Session</h2>
-          <p className="mb-5 text-sm text-amber-100/70">{formatDateLong(selectedDate)}</p>
+          <h2 className="mb-1 text-base sm:text-lg font-semibold text-amber-200">Select a Session</h2>
+          <p className="mb-5 text-xs sm:text-sm text-amber-100/70">{formatDateLong(selectedDate)}</p>
 
           <div className="grid gap-4 sm:grid-cols-2">
             {[
@@ -266,6 +328,46 @@ export default function BookSlot() {
           </button>
           <h2 className="mb-4 text-lg font-semibold text-amber-200">Your Details</h2>
 
+          {/* Top Notice Banner: Timings (English) */}
+          <div className="mb-6 overflow-hidden rounded-2xl border border-amber-400/30 bg-gradient-to-r from-maroon-950/90 via-amber-950/50 to-maroon-950/90 p-4 shadow-xl backdrop-blur-md">
+            <div className="flex items-start gap-3">
+              <div className="grid h-10 w-10 flex-shrink-0 place-items-center rounded-xl bg-amber-500/20 text-amber-300 border border-amber-400/40 shadow-[0_0_15px_rgba(245,158,11,0.3)]">
+                <Clock size={20} />
+              </div>
+              <div className="flex-1 text-xs sm:text-sm">
+                <p className="font-bold text-amber-200 tracking-wide flex items-center gap-1.5 uppercase">
+                  ⏰ Important Delivery Schedule
+                </p>
+                <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                  <div
+                    className={`rounded-xl p-2.5 border transition-all ${
+                      selectedSession === "morning"
+                        ? "bg-amber-500/20 border-amber-400/70 text-amber-200 font-semibold shadow-[0_0_10px_rgba(245,158,11,0.2)]"
+                        : "bg-white/5 border-white/10 text-amber-100/70"
+                    }`}
+                  >
+                    <span className="block text-[11px] font-bold uppercase tracking-wider text-amber-300">
+                      🌅 Morning Session
+                    </span>
+                    Prasad must be delivered to the office by <strong className="text-white font-extrabold text-sm">9:00 AM</strong>.
+                  </div>
+                  <div
+                    className={`rounded-xl p-2.5 border transition-all ${
+                      selectedSession === "evening"
+                        ? "bg-amber-500/20 border-amber-400/70 text-amber-200 font-semibold shadow-[0_0_10px_rgba(245,158,11,0.2)]"
+                        : "bg-white/5 border-white/10 text-amber-100/70"
+                    }`}
+                  >
+                    <span className="block text-[11px] font-bold uppercase tracking-wider text-amber-300">
+                      🌆 Evening Session
+                    </span>
+                    Prasad must be delivered to the office by <strong className="text-white font-extrabold text-sm">6:00 PM</strong>.
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <form onSubmit={handleSubmit(onFormSubmit)} className="space-y-5">
             <div>
               <label htmlFor="name" className="mb-1.5 block text-xs font-semibold text-amber-200 uppercase tracking-wider">
@@ -307,6 +409,66 @@ export default function BookSlot() {
               )}
             </div>
 
+            {/* Delivery Mode: Self (Default) vs Office */}
+            <div>
+              <label className="mb-2 block text-xs font-semibold text-amber-200 uppercase tracking-wider">
+                Prasad Delivery Mode
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setValue("prasadDeliveryMode", "Self")}
+                  className={`flex items-center gap-3 p-3.5 rounded-xl border transition-all text-left ${
+                    watchDeliveryMode === "Self"
+                      ? "border-amber-400 bg-amber-500/25 text-white shadow-[0_0_15px_rgba(245,158,11,0.25)] font-semibold"
+                      : "border-white/10 bg-white/5 text-amber-100/70 hover:bg-white/10"
+                  }`}
+                >
+                  <span className="text-2xl">🛍️</span>
+                  <div>
+                    <div className="text-sm font-semibold text-white">Self</div>
+                    <div className="text-[11px] text-amber-300/80">Default · I will bring it myself</div>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setValue("prasadDeliveryMode", "Office")}
+                  className={`flex items-center gap-3 p-3.5 rounded-xl border transition-all text-left ${
+                    watchDeliveryMode === "Office"
+                      ? "border-amber-400 bg-amber-500/25 text-white shadow-[0_0_15px_rgba(245,158,11,0.25)] font-semibold"
+                      : "border-white/10 bg-white/5 text-amber-100/70 hover:bg-white/10"
+                  }`}
+                >
+                  <span className="text-2xl">🏢</span>
+                  <div>
+                    <div className="text-sm font-semibold text-white">Office</div>
+                    <div className="text-[11px] text-amber-300/80">Deliver / Arrange at office</div>
+                  </div>
+                </button>
+              </div>
+              <input type="hidden" {...register("prasadDeliveryMode")} />
+            </div>
+
+            {/* Prasad Item Input */}
+            <div>
+              <label htmlFor="prasadItem" className="mb-1.5 block text-xs font-semibold text-amber-200 uppercase tracking-wider">
+                Prasad Item (What are you bringing?)
+              </label>
+              <div className="relative">
+                <Gift className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-amber-400" size={18} />
+                <input
+                  id="prasadItem"
+                  {...register("prasadItem")}
+                  placeholder="e.g. Modak, Motichoor Ladoo, Kheer, Fruits..."
+                  className="min-h-[52px] w-full rounded-xl border border-amber-400/25 bg-white/5 pl-10 pr-4 text-base text-white placeholder:text-gray-400 focus:border-amber-400 focus:ring-1 focus:ring-amber-400 outline-none transition"
+                />
+              </div>
+              {errors.prasadItem && (
+                <p className="mt-1.5 text-sm text-red-400">{errors.prasadItem.message}</p>
+              )}
+            </div>
+
             <button
               type="submit"
               className="btn-gold-3d w-full"
@@ -333,10 +495,17 @@ export default function BookSlot() {
             <SummaryRow label="Mobile" value={formValues.mobile} />
             <SummaryRow label="Date" value={formatDateLong(selectedDate)} />
             <SummaryRow label="Session" value={sessionLabel(selectedSession)} />
+            <SummaryRow label="Delivery Mode" value={formValues.prasadDeliveryMode} />
+            <SummaryRow label="Prasad Item" value={formValues.prasadItem} />
+            <SummaryRow
+              label="Office Arrival Deadline"
+              value={selectedSession === "morning" ? "By 9:00 AM" : "By 6:00 PM"}
+              strong
+            />
           </div>
 
           <div className="mt-4 rounded-xl border border-amber-500/30 bg-amber-950/30 p-4 text-sm text-amber-200/90">
-            ℹ️ Your application will be reviewed by the temple administrator. The slot
+            ℹ️ Your application will be reviewed by the administrator. The slot
             will be allotted only after verification.
           </div>
 
@@ -373,12 +542,25 @@ export default function BookSlot() {
             <SummaryRow label="Application ID" value={result.applicationId} strong />
             <SummaryRow label="Date" value={formatDateLong(result.date)} />
             <SummaryRow label="Session" value={sessionLabel(result.session)} />
+            {result.prasadItem && (
+              <SummaryRow label="Prasad Item" value={result.prasadItem} />
+            )}
+            {result.prasadDeliveryMode && (
+              <SummaryRow label="Delivery Mode" value={result.prasadDeliveryMode} />
+            )}
             <div className="flex items-center justify-between px-5 py-4">
               <span className="text-sm text-amber-100/60">Status</span>
               <span className="rounded-full bg-amber-950/80 border border-amber-500/40 px-3 py-1 text-xs font-semibold text-amber-300">
                 Pending Verification
               </span>
             </div>
+          </div>
+
+          <div className="mt-4 w-full rounded-xl border border-amber-400/30 bg-amber-950/40 p-3.5 text-center text-xs sm:text-sm text-amber-200">
+            ⏰ <strong>Delivery Reminder:</strong> Please ensure the Prasad arrives at the office by{" "}
+            <strong className="text-white">
+              {result.session === "morning" ? "9:00 AM" : "6:00 PM"}
+            </strong>.
           </div>
 
           <div className="mt-8 flex flex-col sm:flex-row gap-3 w-full">

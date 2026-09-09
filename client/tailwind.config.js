@@ -1,4 +1,4 @@
-﻿/** @type {import("tailwindcss").Config} */
+/** @type {import("tailwindcss").Config} */
 export default {
   content: ["./index.html", "./src/**/*.{js,jsx}"],
   theme: {
@@ -20,6 +20,8 @@ export default {
           500: "#f97316",
           600: "#ea580c",
           700: "#c2410c",
+          800: "#9a3412",
+          900: "#7c2d12",
         },
         gold: {
           300: "#fcd34d",
@@ -38,6 +40,7 @@ export default {
           700: "#7c1f1f",
           800: "#5c1616",
           900: "#400f0f",
+          950: "#220505",
         },
         cream: {
           50:  "#fffdf7",

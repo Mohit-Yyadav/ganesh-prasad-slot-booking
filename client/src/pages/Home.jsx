@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { getAllSlots } from "../services/api";
 
@@ -75,46 +75,97 @@ function SkeletonCard() {
 }
 
 export default function Home() {
-  const [dates, setDates]   = useState([]);
+  const [dates, setDates] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError]   = useState("");
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [error, setError] = useState("");
 
-  useEffect(() => {
-    getAllSlots()
-      .then((data) => setDates(data.dates || []))
-      .catch(() => setError("Unable to load slots. Please try again."))
-      .finally(() => setLoading(false));
+  const fetchSlots = useCallback((isSilent = false) => {
+    if (!isSilent) setLoading(true);
+    else setIsRefreshing(true);
+
+    return getAllSlots()
+      .then((data) => {
+        setDates(data.dates || []);
+        setError("");
+      })
+      .catch((err) => {
+        if (!isSilent) setError("Unable to load slots. Please try again.");
+      })
+      .finally(() => {
+        if (!isSilent) setLoading(false);
+        setIsRefreshing(false);
+      });
   }, []);
 
-  const totalBooked = dates.reduce((acc, d) => {
-    if (d.morning?.status === "allotted" || d.morning?.status === "booked") acc++;
-    if (d.evening?.status === "allotted" || d.evening?.status === "booked") acc++;
-    return acc;
-  }, 0);
-  const totalSlots = dates.length * 2;
-  const availableSlots = totalSlots - totalBooked;
+  useEffect(() => {
+    // Initial fetch
+    fetchSlots(false);
+
+    // Auto-refresh interval (every 4 seconds)
+    const intervalId = setInterval(() => {
+      if (document.visibilityState === "visible") {
+        fetchSlots(true);
+      }
+    }, 4000);
+
+    // Instant refresh when user returns to the tab or focuses window
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        fetchSlots(true);
+      }
+    };
+    const onFocus = () => {
+      fetchSlots(true);
+    };
+
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    window.addEventListener("focus", onFocus);
+
+    return () => {
+      clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [fetchSlots]);
+
+  let totalSlots = 0;
+  let totalBooked = 0;
+  let availableSlots = 0;
+  for (const d of dates) {
+    for (const s of ["morning", "evening"]) {
+      if (d[s]) {
+        totalSlots++;
+        if (d[s].status === "allotted" || d[s].status === "booked") {
+          totalBooked++;
+        } else if (d[s].status === "available") {
+          availableSlots++;
+        }
+      }
+    }
+  }
 
   return (
     <div className="flex flex-col min-h-screen">
-      <main className="flex-1 mx-auto w-full max-w-6xl px-4 sm:px-6 py-8 sm:py-12">
+      <main className="flex-1 mx-auto w-full max-w-6xl px-3 sm:px-6 py-6 sm:py-12">
         {/* ── 3D Hero Header ──────────────────────────────────────────── */}
-        <div className="text-center mb-10 sm:mb-12">
+        <div className="text-center mb-8 sm:mb-12">
           {/* Company Initiative Badge */}
-          <div className="inline-flex items-center gap-2.5 px-4 py-1.5 rounded-full bg-gradient-to-r from-white/10 via-white/15 to-white/10 backdrop-blur-md shadow-lg mb-5 border border-amber-400/30">
-            <span className="text-[11px] font-bold text-amber-300 tracking-wider uppercase">Initiative by</span>
+          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-gradient-to-r from-white/10 via-white/15 to-white/10 backdrop-blur-md shadow-lg mb-4 sm:mb-5 border border-amber-400/30">
+            <span className="text-[10px] sm:text-[11px] font-bold text-amber-300 tracking-wider uppercase">Initiative by</span>
             <div className="bg-white rounded-md px-2 py-0.5 flex items-center shadow-sm">
               <img src="/company-logo.png" alt="Codes for Tomorrow" className="h-4 sm:h-5 w-auto object-contain" />
             </div>
           </div>
 
           {/* 3D Floating Lord Ganesha Centerpiece (No Black Box) */}
-          <div className="relative mx-auto w-36 h-36 sm:w-44 sm:h-44 mb-6 flex items-center justify-center">
+          <div className="relative mx-auto w-32 h-32 sm:w-44 sm:h-44 mb-5 sm:mb-6 flex items-center justify-center">
             {/* Ambient Divine Aura Glow */}
             <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-amber-500/35 via-orange-500/40 to-amber-300/25 blur-3xl animate-divine-pulse" />
 
             {/* Rotating Sacred Mandala / Halo Rays */}
-            <div className="absolute -inset-4 rounded-full border-2 border-dashed border-amber-400/35 animate-glow-spin" />
-            <div className="absolute -inset-2 rounded-full border border-amber-400/45 animate-divine-pulse" />
+            <div className="absolute -inset-3 sm:-inset-4 rounded-full border-2 border-dashed border-amber-400/35 animate-glow-spin" />
+            <div className="absolute -inset-1.5 sm:-inset-2 rounded-full border border-amber-400/45 animate-divine-pulse" />
 
             {/* Circular Divine Medallion with Sculpted Golden Bevel */}
             <div className="relative w-full h-full rounded-full p-1.5 bg-gradient-to-b from-amber-200 via-amber-500 to-amber-900 shadow-[0_20px_45px_rgba(229,193,88,0.55),0_0_30px_rgba(249,115,22,0.4)] animate-float-3d overflow-hidden">
@@ -132,7 +183,7 @@ export default function Home() {
           <h1
             className="font-display font-extrabold mb-2 tracking-wide"
             style={{
-              fontSize: "clamp(2rem, 5.5vw, 3.2rem)",
+              fontSize: "clamp(1.85rem, 5.5vw, 3.2rem)",
               background: "linear-gradient(135deg, #fff7ed 0%, #fef08a 25%, #e5c158 50%, #f59e0b 80%, #d97706 100%)",
               WebkitBackgroundClip: "text",
               WebkitTextFillColor: "transparent",
@@ -143,7 +194,7 @@ export default function Home() {
           </h1>
 
           <p
-            className="text-sm sm:text-base mb-6 max-w-xl mx-auto px-4"
+            className="text-xs sm:text-base mb-6 max-w-xl mx-auto px-4"
             style={{ color: "rgba(253,246,232,0.65)", letterSpacing: "0.02em" }}
           >
             Codes for Tomorrow · Devotee Prasad Seva Slot Allotment
@@ -151,18 +202,18 @@ export default function Home() {
 
           {/* 3D Glass Stats Bar */}
           {!loading && totalSlots > 0 && (
-            <div className="grid grid-cols-3 gap-3 max-w-md mx-auto mb-8">
-              <div className="stat-card-3d text-center">
-                <p className="text-[11px] font-medium uppercase tracking-wider text-amber-300/80">Total Slots</p>
-                <p className="text-xl sm:text-2xl font-bold text-white mt-0.5">{totalSlots}</p>
+            <div className="grid grid-cols-3 gap-2 sm:gap-3 max-w-md mx-auto mb-7 sm:mb-8 px-2">
+              <div className="stat-card-3d text-center p-2.5 sm:p-4">
+                <p className="text-[10px] sm:text-[11px] font-medium uppercase tracking-wider text-amber-300/80 truncate">Total Slots</p>
+                <p className="text-lg sm:text-2xl font-bold text-white mt-0.5">{totalSlots}</p>
               </div>
-              <div className="stat-card-3d text-center">
-                <p className="text-[11px] font-medium uppercase tracking-wider text-orange-400">Allotted</p>
-                <p className="text-xl sm:text-2xl font-bold text-orange-400 mt-0.5">{totalBooked}</p>
+              <div className="stat-card-3d text-center p-2.5 sm:p-4">
+                <p className="text-[10px] sm:text-[11px] font-medium uppercase tracking-wider text-orange-400 truncate">Allotted</p>
+                <p className="text-lg sm:text-2xl font-bold text-orange-400 mt-0.5">{totalBooked}</p>
               </div>
-              <div className="stat-card-3d text-center">
-                <p className="text-[11px] font-medium uppercase tracking-wider text-amber-300">Available</p>
-                <p className="text-xl sm:text-2xl font-bold text-amber-300 mt-0.5">{availableSlots}</p>
+              <div className="stat-card-3d text-center p-2.5 sm:p-4">
+                <p className="text-[10px] sm:text-[11px] font-medium uppercase tracking-wider text-amber-300 truncate">Available</p>
+                <p className="text-lg sm:text-2xl font-bold text-amber-300 mt-0.5">{availableSlots}</p>
               </div>
             </div>
           )}
@@ -176,6 +227,20 @@ export default function Home() {
             <Link to="/status" className="btn-saffron-3d w-full sm:w-auto">
               Check My Status
             </Link>
+          </div>
+
+          {/* Live Auto-Refresh Indicator */}
+          <div className="mt-7 flex items-center justify-center">
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-medium bg-amber-950/40 border border-amber-500/30 text-amber-200/90 shadow-sm backdrop-blur-md">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              </span>
+              <span>Live Updates Active</span>
+              {isRefreshing && (
+                <span className="text-[11px] text-amber-400 font-mono animate-pulse">· Syncing...</span>
+              )}
+            </div>
           </div>
         </div>
 
