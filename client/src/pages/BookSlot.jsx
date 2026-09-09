@@ -338,31 +338,33 @@ export default function BookSlot() {
                 <p className="font-bold text-amber-200 tracking-wide flex items-center gap-1.5 uppercase">
                   ⏰ Important Delivery Schedule
                 </p>
-                <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                  <div
-                    className={`rounded-xl p-2.5 border transition-all ${
-                      selectedSession === "morning"
-                        ? "bg-amber-500/20 border-amber-400/70 text-amber-200 font-semibold shadow-[0_0_10px_rgba(245,158,11,0.2)]"
-                        : "bg-white/5 border-white/10 text-amber-100/70"
-                    }`}
-                  >
-                    <span className="block text-[11px] font-bold uppercase tracking-wider text-amber-300">
-                      🌅 Morning Session
-                    </span>
-                    Prasad must be delivered to the office by <strong className="text-white font-extrabold text-sm">9:00 AM</strong>.
-                  </div>
-                  <div
-                    className={`rounded-xl p-2.5 border transition-all ${
-                      selectedSession === "evening"
-                        ? "bg-amber-500/20 border-amber-400/70 text-amber-200 font-semibold shadow-[0_0_10px_rgba(245,158,11,0.2)]"
-                        : "bg-white/5 border-white/10 text-amber-100/70"
-                    }`}
-                  >
-                    <span className="block text-[11px] font-bold uppercase tracking-wider text-amber-300">
-                      🌆 Evening Session
-                    </span>
-                    Prasad must be delivered to the office by <strong className="text-white font-extrabold text-sm">6:00 PM</strong>.
-                  </div>
+                <div className="mt-2.5 text-xs">
+                  {selectedSession === "morning" ? (
+                    <div className="rounded-xl p-3 border bg-amber-500/20 border-amber-400/70 text-amber-200 font-semibold shadow-[0_0_10px_rgba(245,158,11,0.2)]">
+                      <span className="block text-xs font-bold uppercase tracking-wider text-amber-300 mb-1">
+                        🌅 Morning Session Delivery Deadline
+                      </span>
+                      Prasad must be delivered to the office by <strong className="text-white font-extrabold text-sm">9:00 AM</strong>.
+                    </div>
+                  ) : selectedSession === "evening" ? (
+                    <div className="rounded-xl p-3 border bg-amber-500/20 border-amber-400/70 text-amber-200 font-semibold shadow-[0_0_10px_rgba(245,158,11,0.2)]">
+                      <span className="block text-xs font-bold uppercase tracking-wider text-amber-300 mb-1">
+                        🌆 Evening Session Delivery Deadline
+                      </span>
+                      Prasad must be delivered to the office by <strong className="text-white font-extrabold text-sm">6:00 PM</strong>.
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <div className="rounded-xl p-2.5 border bg-white/5 border-white/10 text-amber-100/70">
+                        <span className="block text-[11px] font-bold uppercase tracking-wider text-amber-300">🌅 Morning</span>
+                        By <strong className="text-white font-bold">9:00 AM</strong>.
+                      </div>
+                      <div className="rounded-xl p-2.5 border bg-white/5 border-white/10 text-amber-100/70">
+                        <span className="block text-[11px] font-bold uppercase tracking-wider text-amber-300">🌆 Evening</span>
+                        By <strong className="text-white font-bold">6:00 PM</strong>.
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

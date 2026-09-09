@@ -153,7 +153,9 @@ async function getApplicationStatus(req, res, next) {
 
     let query = {};
     if (applicationId) {
-      query.applicationId = String(applicationId).trim();
+      const cleanId = String(applicationId).trim();
+      const escaped = cleanId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      query.applicationId = { $regex: new RegExp(`^${escaped}$`, "i") };
     } else {
       if (!/^[6-9]\d{9}$/.test(String(mobile).trim())) {
         throw new AppError("Please enter a valid 10-digit mobile number.", 400);

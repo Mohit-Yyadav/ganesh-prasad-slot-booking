@@ -142,34 +142,19 @@ export default function Dashboard() {
               <Link
                 key={a.id}
                 to={`/admin/applications/${a.id}`}
-                className="flex items-center justify-between gap-3 py-3 px-2 rounded-xl hover:bg-cream-50 transition border border-transparent hover:border-saffron-200"
+                className="flex items-center justify-between gap-3 py-3 px-2.5 rounded-xl hover:bg-cream-50 transition border border-transparent hover:border-saffron-200 group"
               >
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <p className="text-base font-bold text-maroon-900">{a.name}</p>
-                    <span className="text-xs font-mono font-bold text-maroon-900 bg-cream-100 px-2 py-0.5 rounded border border-saffron-300">
-                      {a.mobile}
-                    </span>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-maroon-800">
-                    <span className="font-bold text-maroon-900">📅 {formatDateLong(a.date)}</span>
-                    <span className="text-gray-400">·</span>
-                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold ${
-                      a.session === "morning"
-                        ? "bg-amber-100 text-amber-950 border border-amber-300"
-                        : "bg-purple-100 text-purple-950 border border-purple-300"
-                    }`}>
-                      {a.session === "morning" ? "☀️ Morning" : "🌙 Evening"}
-                    </span>
-                    {a.prasadItem && (
-                      <>
-                        <span className="text-gray-400">·</span>
-                        <span className="text-amber-900 font-bold">🍱 {a.prasadItem}</span>
-                      </>
-                    )}
-                  </div>
+                <div className="space-y-0.5 min-w-0 flex-1">
+                  <p className="text-sm sm:text-base font-bold text-maroon-900 group-hover:text-saffron-800 transition truncate">
+                    {a.name}
+                  </p>
+                  <p className="text-xs font-semibold text-maroon-700/85">
+                    📅 {formatDateLong(a.date)}
+                  </p>
                 </div>
-                <StatusBadge status={a.status} />
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <StatusBadge status={a.status} />
+                </div>
               </Link>
             ))}
           </div>
