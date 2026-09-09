@@ -1,10 +1,10 @@
 import React, { useState } from "react";
 import { Link, NavLink } from "react-router-dom";
-import { Menu, X, Download } from "lucide-react";
+import { Menu, X } from "lucide-react";
 
 const navLinks = [
-  { to: "/",       label: "Home" },
-  { to: "/book",   label: "Book Slot" },
+  { to: "/", label: "Home" },
+  { to: "/book", label: "Book Slot" },
   { to: "/status", label: "Check Status" },
 ];
 
@@ -46,10 +46,9 @@ export default function Header() {
               to={l.to}
               end={l.to === "/"}
               className={({ isActive }) =>
-                `text-sm font-medium transition-colors ${
-                  isActive
-                    ? "text-gold-400"
-                    : "text-cream-100/70 hover:text-cream-100"
+                `text-sm font-medium transition-colors ${isActive
+                  ? "text-gold-400"
+                  : "text-cream-100/70 hover:text-cream-100"
                 }`
               }
             >
@@ -94,25 +93,13 @@ export default function Header() {
               end={l.to === "/"}
               onClick={() => setOpen(false)}
               className={({ isActive }) =>
-                `block min-h-[44px] rounded-lg px-3 py-3 text-base font-medium transition-colors ${
-                  isActive ? "text-gold-400" : "text-cream-100/70"
+                `block min-h-[44px] rounded-lg px-3 py-3 text-base font-medium transition-colors ${isActive ? "text-gold-400" : "text-cream-100/70"
                 }`
               }
             >
               {l.label}
             </NavLink>
           ))}
-          <button
-            type="button"
-            onClick={() => {
-              setOpen(false);
-              window.dispatchEvent(new CustomEvent("open-pwa-install"));
-            }}
-            className="flex items-center gap-2.5 w-full min-h-[44px] rounded-lg px-3 py-3 text-base font-medium text-amber-300 hover:text-amber-200 transition-colors"
-          >
-            <Download size={18} />
-            <span>Install App / Add to Home</span>
-          </button>
           <Link
             to="/admin/login"
             onClick={() => setOpen(false)}
